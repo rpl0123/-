@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="ko" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>갤럭시 알람 시계</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        oneui: {
+                            bg: '#000000',
+                            card: '#1C1C1E',
+                            cardHover: '#2C2C2E',
+                            accent: '#3E82F7',
+                            accentLight: '#60A5FA',
+                            text: '#F2F2F7',
+                            subtext: '#8E8E93',
+                            danger: '#FF453A',
+                            success: '#30D158'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Helvetica', 'Arial', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome for Samsung One UI style icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom UI Tweaks & Animations */
+        body {
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            overscroll-behavior: none;
+        }
+
+        /* Glassmorphism & Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 4px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #3A3A3C;
+            border-radius: 4px;
+        }
+
+        /* Pulse Animation for Ringing Overlay */
+        @keyframes ringPulse {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.05); opacity: 1; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .ring-animation {
+            animation: ringPulse 1.5s infinite ease-in-out;
+        }
+
+        /* Toggle Switch Styling */
+        .toggle-checkbox:checked {
+            right: 0;
+            border-color: #3E82F7;
+        }
+        .toggle-checkbox:checked + .toggle-label {
+            background-color: #3E82F7;
+        }
+    </style>
+</head>
+<body class="bg-oneui-bg text-oneui-text antialiased min-h-screen flex flex-col items-center justify-center p-0 md:p-4">
+
+    <!-- Main Mobile Container (Emulating Galaxy Phone Display) -->
+    <div class="w-full max-w-md h-screen md:h-[844px] bg-black md:rounded-[48px] md:border-[8px] md:border-[#2C2C2E] shadow-2xl flex flex-col justify-between overflow-hidden relative border-none">
+        
+        <!-- Status Bar (Galaxy Style) -->
+        <div class="w-full px-6 pt-3 pb-1 flex justify-between items-center text-xs text-oneui-subtext z-10 select-none">
+            <span id="statusBarTime" class="font-semibold text-oneui-text">12:00</span>
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-wifi"></i>
+                <i class="fa-solid fa-signal"></i>
+                <i class="fa-solid fa-battery-full text-oneui-text"></i>
+            </div>
+        </div>
+
+        <!-- Header Title -->
+        <header class="px-6 py-2 flex justify-between items-center z-10">
+            <div>
+                <h1 id="headerTitle" class="text-2xl font-bold tracking-tight">알람</h1>
+                <p id="nextAlarmSummary" class="text-xs text-oneui-subtext mt-0.5">설정된 알람 없음</p>
+            </div>
+            <div class="flex items-center space-x-2">
+                <button id="testRingBtn" class="px-3 py-1.5 rounded-full bg-oneui-card hover:bg-oneui-cardHover text-oneui-accent text-xs font-semibold transition-all shadow active:scale-95 flex items-center space-x-1">
+                    <i class="fa-solid fa-bell"></i>
+                    <span>테스트 울림</span>
+                </button>
+                <button id="addAlarmBtn" class="w-10 h-10 rounded-full bg-oneui-card hover:bg-oneui-cardHover text-oneui-accent flex items-center justify-center text-xl transition-all shadow-md active:scale-95">
+                    <i class="fa-solid fa-plus"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content Area: Tab 1 (Alarm) -->
+        <main id="tabAlarm" class="flex-1 overflow-y-auto px-4 py-2 space-y-4">
+
+            <!-- Real-time Clock View (Digital & Analog Switcher) -->
+            <section class="bg-oneui-card rounded-3xl p-5 flex flex-col items-center justify-center relative shadow-inner">
+                <!-- Clock Toggle Tabs -->
+                <div class="absolute top-3 right-4 flex space-x-1 bg-black/40 p-1 rounded-full text-xs">
+                    <button id="viewDigitalBtn" class="px-3 py-1 rounded-full font-medium text-oneui-accent bg-oneui-card transition-all">디지털</button>
+                    <button id="viewAnalogBtn" class="px-3 py-1 rounded-full font-medium text-oneui-subtext transition-all">아날로그</button>
+                </div>
+
+                <!-- Digital Clock Display -->
+                <div id="digitalClockContainer" class="flex flex-col items-center py-4 my-2">
+                    <div class="text-xs font-semibold tracking-wider text-oneui-accent mb-1" id="currentDateStr">2026년 11월 12일 (목)</div>
+                    <div class="text-5xl font-extrabold tracking-tight text-white flex items-baseline">
+                        <span id="digitalAmpm" class="text-base font-bold text-oneui-subtext mr-2">오전</span>
+                        <span id="digitalHours">00</span>
+                        <span class="animate-pulse mx-0.5 text-oneui-accent">:</span>
+                        <span id="digitalMinutes">00</span>
+                        <span class="text-lg font-medium text-oneui-subtext ml-2" id="digitalSeconds">00</span>
+                    </div>
+                </div>
+
+                <!-- Analog Clock Display (Hidden by default) -->
+                <div id="analogClockContainer" class="hidden py-2 my-1 flex flex-col items-center">
+                    <div class="relative w-36 h-36 rounded-full border-4 border-oneui-cardHover flex items-center justify-center bg-black/50 shadow-md">
+                        <!-- Clock Center Pin -->
+                        <div class="w-3 h-3 bg-oneui-accent rounded-full z-30 shadow"></div>
+                        <!-- Clock Hands -->
+                        <div id="hourHand" class="absolute w-1.5 h-10 bg-white rounded-full origin-bottom bottom-1/2 left-1/2 -ml-0.75 transition-transform duration-300"></div>
+                        <div id="minuteHand" class="absolute w-1 h-14 bg-oneui-subtext rounded-full origin-bottom bottom-1/2 left-1/2 -ml-0.5 transition-transform duration-300"></div>
+                        <div id="secondHand" class="absolute w-0.5 h-16 bg-oneui-accent rounded-full origin-bottom bottom-1/2 left-1/2 -ml-0.25 transition-transform duration-75"></div>
+                        
+                        <!-- Hour Markers -->
+                        <span class="absolute top-1 text-[10px] font-bold text-oneui-subtext">12</span>
+                        <span class="absolute right-2 text-[10px] font-bold text-oneui-subtext">3</span>
+                        <span class="absolute bottom-1 text-[10px] font-bold text-oneui-subtext">6</span>
+                        <span class="absolute left-2 text-[10px] font-bold text-oneui-subtext">9</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Alarms List Container -->
+            <section class="space-y-3 pb-6">
+                <div class="flex justify-between items-center px-2">
+                    <h2 class="text-sm font-semibold text-oneui-subtext uppercase tracking-wider">저장된 알람</h2>
+                    <span id="alarmCountBadge" class="text-xs bg-oneui-card px-2.5 py-0.5 rounded-full text-oneui-subtext font-medium">0개</span>
+                </div>
+
+                <!-- List Output -->
+                <div id="alarmList" class="space-y-3">
+                    <!-- Dynamic Alarm Items will be injected here -->
+                </div>
+
+                <!-- Empty State -->
+                <div id="emptyState" class="hidden flex flex-col items-center justify-center py-10 text-center space-y-2">
+                    <div class="w-16 h-16 rounded-full bg-oneui-card flex items-center justify-center text-oneui-subtext text-2xl">
+                        <i class="fa-regular fa-bell-slash"></i>
+                    </div>
+                    <p class="text-sm text-oneui-subtext font-medium">등록된 알람이 없습니다.</p>
+                    <p class="text-xs text-oneui-subtext/70">+ 버튼을 눌러 첫 알람을 추가하세요.</p>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- Tab 2: World Clock -->
+        <main id="tabWorld" class="hidden flex-1 overflow-y-auto px-4 py-2 space-y-3">
+            <div class="bg-oneui-card rounded-3xl p-5 flex justify-between items-center border border-white/5">
+                <div>
+                    <div class="text-lg font-bold">서울</div>
+                    <div class="text-xs text-oneui-subtext">대한민국 표준시 (현재 위치)</div>
+                </div>
+                <div class="text-2xl font-extrabold text-oneui-accent" id="worldSeoulTime">00:00</div>
+            </div>
+            <div class="bg-oneui-card rounded-3xl p-5 flex justify-between items-center border border-white/5">
+                <div>
+                    <div class="text-lg font-bold">뉴욕</div>
+                    <div class="text-xs text-oneui-subtext">어제 • -14시간</div>
+                </div>
+                <div class="text-2xl font-extrabold" id="worldNyTime">00:00</div>
+            </div>
+            <div class="bg-oneui-card rounded-3xl p-5 flex justify-between items-center border border-white/5">
+                <div>
+                    <div class="text-lg font-bold">런던</div>
+                    <div class="text-xs text-oneui-subtext">오늘 • -9시간</div>
+                </div>
+                <div class="text-2xl font-extrabold" id="worldLondonTime">00:00</div>
+            </div>
+            <div class="bg-oneui-card rounded-3xl p-5 flex justify-between items-center border border-white/5">
+                <div>
+                    <div class="text-lg font-bold">도쿄</div>
+                    <div class="text-xs text-oneui-subtext">오늘 • 시차 없음</div>
+                </div>
+                <div class="text-2xl font-extrabold" id="worldTokyoTime">00:00</div>
+            </div>
+        </main>
+
+        <!-- Tab 3: Stopwatch -->
+        <main id="tabStopwatch" class="hidden flex-1 flex flex-col justify-between px-6 py-8">
+            <div class="flex-1 flex flex-col items-center justify-center">
+                <div class="text-5xl font-extrabold tracking-tight font-mono" id="swDisplay">00:00.<span class="text-3xl text-oneui-accent">00</span></div>
+                <div id="swLaps" class="w-full max-h-48 overflow-y-auto mt-6 space-y-2 text-sm text-oneui-subtext px-2"></div>
+            </div>
+            <div class="flex justify-center space-x-4 pb-4">
+                <button id="swLapBtn" class="w-24 py-3.5 rounded-full bg-oneui-card text-white font-bold text-sm active:scale-95 transition-all">구간 기록</button>
+                <button id="swStartBtn" class="w-24 py-3.5 rounded-full bg-oneui-accent text-white font-bold text-sm active:scale-95 transition-all">시작</button>
+            </div>
+        </main>
+
+        <!-- Tab 4: Timer -->
+        <main id="tabTimer" class="hidden flex-1 flex flex-col justify-between px-6 py-8">
+            <div class="flex-1 flex flex-col items-center justify-center space-y-6">
+                <div id="timerDisplay" class="text-5xl font-extrabold tracking-tight font-mono">00:01:00</div>
+                <div id="timerPresets" class="flex space-x-2">
+                    <button onclick="setTimerPreset(60)" class="px-4 py-2 rounded-full bg-oneui-card text-xs font-semibold hover:bg-oneui-cardHover">+1분</button>
+                    <button onclick="setTimerPreset(300)" class="px-4 py-2 rounded-full bg-oneui-card text-xs font-semibold hover:bg-oneui-cardHover">+5분</button>
+                    <button onclick="setTimerPreset(600)" class="px-4 py-2 rounded-full bg-oneui-card text-xs font-semibold hover:bg-oneui-cardHover">+10분</button>
+                </div>
+            </div>
+            <div class="flex justify-center space-x-4 pb-4">
+                <button id="timerResetBtn" class="w-24 py-3.5 rounded-full bg-oneui-card text-white font-bold text-sm active:scale-95 transition-all">초기화</button>
+                <button id="timerStartBtn" class="w-24 py-3.5 rounded-full bg-oneui-accent text-white font-bold text-sm active:scale-95 transition-all">시작</button>
+            </div>
+        </main>
+
+        <!-- Navigation Bar (One UI Bottom Navigation Style) -->
+        <nav class="bg-oneui-card border-t border-white/5 py-3 px-6 flex justify-around items-center text-xs z-10">
+            <button data-tab="alarm" class="nav-tab-btn flex flex-col items-center space-y-1 text-oneui-accent">
+                <i class="fa-solid fa-clock text-lg"></i>
+                <span class="font-medium">알람</span>
+            </button>
+            <button data-tab="world" class="nav-tab-btn flex flex-col items-center space-y-1 text-oneui-subtext hover:text-white transition-colors">
+                <i class="fa-solid fa-globe text-lg"></i>
+                <span class="font-medium">세계시각</span>
+            </button>
+            <button data-tab="stopwatch" class="nav-tab-btn flex flex-col items-center space-y-1 text-oneui-subtext hover:text-white transition-colors">
+                <i class="fa-solid fa-stopwatch text-lg"></i>
+                <span class="font-medium">스톱워치</span>
+            </button>
+            <button data-tab="timer" class="nav-tab-btn flex flex-col items-center space-y-1 text-oneui-subtext hover:text-white transition-colors">
+                <i class="fa-solid fa-hourglass-half text-lg"></i>
+                <span class="font-medium">타이머</span>
+            </button>
+        </nav>
+
+        <!-- Modal: Add / Edit Alarm -->
+        <div id="alarmModal" class="absolute inset-0 bg-black/80 backdrop-blur-md z-50 flex flex-col justify-end translate-y-full transition-transform duration-300 ease-out">
+            <div class="bg-oneui-card rounded-t-[32px] p-6 space-y-6 max-h-[90%] overflow-y-auto border-t border-white/10">
+                
+                <!-- Modal Header -->
+                <div class="flex justify-between items-center">
+                    <button id="cancelModalBtn" class="text-oneui-subtext text-sm font-medium hover:text-white">취소</button>
+                    <h3 id="modalTitle" class="text-lg font-bold">알람 추가</h3>
+                    <button id="saveAlarmBtn" class="text-oneui-accent text-sm font-bold hover:text-oneui-accentLight">저장</button>
+                </div>
+
+                <!-- Custom Time Selector Inputs -->
+                <div class="flex justify-center items-center py-4 bg-black/40 rounded-2xl border border-white/5">
+                    <input type="time" id="alarmTimeInput" class="bg-transparent text-4xl font-extrabold text-white text-center focus:outline-none cursor-pointer" value="07:00" required>
+                </div>
+
+                <!-- Repeat Days Selector -->
+                <div class="space-y-2">
+                    <label class="text-xs font-semibold text-oneui-subtext uppercase tracking-wider block">반복 요일</label>
+                    <div class="flex justify-between items-center gap-1" id="daySelector">
+                        <button type="button" data-day="0" class="day-btn w-9 h-9 rounded-full bg-black/40 text-xs font-bold text-oneui-subtext flex items-center justify-center transition-all">일</button>
+                        <button type="button" data-day="1" class="day-btn w-9 h-9 rounded-full bg-black/40 text-xs font-bold text-oneui-subtext flex items-center justify-center transition-all">월</button>
+                        <button type="button" data-day="2" class="day-btn w-9 h-9 rounded-full bg-black/40 text-xs font-bold text-oneui-subtext flex items-center justify-center transition-all">화</button>
+                        <button type="button" data-day="3" class="day-btn w-9 h-9 rounded-full bg-black/40 text-xs font-bold text-oneui-subtext flex items-center justify-center transition-all">수</button>
+                        <button type="button" data-day="4" class="day-btn w-9 h-9 rounded-full bg-black/40 text-xs font-bold text-oneui-subtext flex items-center justify-center transition-all">목</button>
+                        <button type="button" data-day="5" class="day-btn w-9 h-9 rounded-full bg-black/40 text-xs font-bold text-oneui-subtext flex items-center justify-center transition-all">금</button>
+                        <button type="button" data-day="6" class="day-btn w-9 h-9 rounded-full bg-black/40 text-xs font-bold text-oneui-subtext flex items-center justify-center transition-all">토</button>
+                    </div>
+                </div>
+
+                <!-- Custom Label -->
+                <div class="space-y-2">
+                    <label for="alarmLabelInput" class="text-xs font-semibold text-oneui-subtext uppercase tracking-wider block">알람 이름</label>
+                    <input type="text" id="alarmLabelInput" placeholder="알람 이름 입력 (예: 기상, 운동)" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white placeholder-oneui-subtext focus:outline-none focus:border-oneui-accent">
+                </div>
+
+                <!-- Ringtone Sound Picker -->
+                <div class="space-y-2">
+                    <label for="soundSelect" class="text-xs font-semibold text-oneui-subtext uppercase tracking-wider block">알람음</label>
+                    <div class="relative">
+                        <select id="soundSelect" class="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-white appearance-none focus:outline-none focus:border-oneui-accent pr-10">
+                            <option value="galaxy">갤럭시 모닝</option>
+                            <option value="classic">클래식 비프</option>
+                            <option value="urgent">긴급 알람</option>
+                            <option value="gentle">부드러운 차임벨</option>
+                            <option value="custom_random">🎵 내 기기 노래 선택 (시작지점 랜덤)</option>
+                        </select>
+                        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-oneui-subtext">
+                            <i class="fa-solid fa-chevron-down text-xs"></i>
+                        </div>
+                    </div>
+
+                    <!-- Custom File Input Container (Shown only when custom_random is selected) -->
+                    <div id="customAudioFileContainer" class="hidden space-y-2 pt-1">
+                        <div class="flex items-center justify-between bg-black/30 p-2.5 rounded-xl border border-white/10">
+                            <input type="file" id="customAudioInput" accept="audio/*" class="hidden">
+                            <button type="button" id="selectAudioFileBtn" class="px-3 py-1.5 bg-oneui-card hover:bg-oneui-cardHover text-xs font-semibold text-oneui-accent rounded-lg border border-white/10 flex items-center space-x-1">
+                                <i class="fa-solid fa-music"></i>
+                                <span>노래 파일 선택</span>
+                            </button>
+                            <span id="customAudioFileName" class="text-xs text-oneui-subtext truncate max-w-[180px]">선택된 파일 없음</span>
+                        </div>
+                    </div>
+
+                    <button type="button" id="previewSoundBtn" class="text-xs text-oneui-accent font-semibold flex items-center space-x-1 pt-1">
+                        <i class="fa-solid fa-volume-high"></i>
+                        <span>알람음 미리듣기 (랜덤 시작 지점)</span>
+                    </button>
+                </div>
+
+                <!-- Snooze Setting Toggle -->
+                <div class="flex items-center justify-between py-2 border-t border-white/5">
+                    <div>
+                        <span class="text-sm font-medium block">다시 울림</span>
+                        <span class="text-xs text-oneui-subtext">5분 간격으로 다시 알림</span>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="snoozeToggle" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-black/60 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-oneui-accent"></div>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fullscreen Ringing Screen Overlay -->
+        <div id="ringingScreen" class="absolute inset-0 bg-gradient-to-b from-blue-900 via-black to-oneui-bg z-50 flex flex-col items-center justify-between p-8 text-center hidden">
+            
+            <div class="mt-12 space-y-4">
+                <div class="w-24 h-24 bg-oneui-accent/20 rounded-full flex items-center justify-center mx-auto ring-animation">
+                    <i class="fa-solid fa-bell text-4xl text-oneui-accent animate-bounce"></i>
+                </div>
+                <div>
+                    <h2 id="ringingTime" class="text-5xl font-extrabold text-white tracking-tight">07:00</h2>
+                    <p id="ringingLabel" class="text-lg font-medium text-oneui-accentLight mt-2">알람</p>
+                </div>
+
+                <!-- Physical Key Lock Notice -->
+                <div class="bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-2 mt-4 max-w-xs mx-auto">
+                    <p class="text-xs text-red-400 font-medium">⚠️ 전원/음량 버튼 동작 불가 — 화면의 해제 버튼으로만 끌 수 있습니다.</p>
+                </div>
+            </div>
+
+            <!-- Dismiss / Snooze Controls -->
+            <div class="w-full space-y-4 mb-8">
+                <!-- Snooze Button -->
+                <button id="snoozeBtn" class="w-full py-4 bg-oneui-card hover:bg-oneui-cardHover text-white font-bold rounded-2xl shadow-lg border border-white/10 transition-all active:scale-95 flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-clock-rotate-left"></i>
+                    <span>5분 다시 울림</span>
+                </button>
+                
+                <!-- Dismiss Slide/Click Button -->
+                <button id="dismissBtn" class="w-full py-4 bg-oneui-danger hover:bg-red-600 text-white font-extrabold rounded-2xl shadow-lg transition-all active:scale-95 flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                    <span>알람 해제</span>
+                </button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        // State Management
+        let alarms = JSON.parse(localStorage.getItem('galaxy_alarms') || '[]');
+        let editingAlarmId = null;
+        let selectedDays = [];
+        let currentClockView = 'digital'; // 'digital' or 'analog'
+        let audioCtx = null;
+        let activeSoundInterval = null;
+        let activeVibrationInterval = null;
+        let activeRingingAlarm = null;
+
+        // Audio Context Initialization Function
+        function initAudioContext() {
+            if (!audioCtx) {
+                const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                if (AudioContextClass) {
+                    audioCtx = new AudioContextClass();
+                }
+            }
+            if (audioCtx && audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+        }
+        
+        // Custom Audio State
+        let customAudioBuffer = null;
+        let customAudioSourceNode = null;
+        let customAudioFileNameStr = '';
+
+        // Day Labels Map
+        const dayNames = ['일', '월', '화', '수', '목', '금', '토'];
+<!-- ... existing code -->
